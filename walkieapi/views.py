@@ -74,11 +74,17 @@ class UserViewset(ModelViewSet):
 
             Jwt.objects.create(user_id=user.id, access=access, refresh=refresh)
 
+
             userdata = UserModel.objects.get(user=user.id)
+            user_contact_list = PairModel.objects.filter(Q(sender=userdata) | Q(receiver=userdata))
             serialized_user = UserSerializer(userdata)
+
+            serialized_contact = PairSerializer(user_contact_list, many=True)
 
             context = {
                 "user": serialized_user.data,
+                "contact_list": serialized_contact.data
+
             }
 
             context['user']["user_id"] = user.id,
