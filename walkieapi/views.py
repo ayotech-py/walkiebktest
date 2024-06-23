@@ -15,7 +15,11 @@ from django.contrib.auth.hashers import make_password
 from .authentication import Authentication
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
-
+import pusher
+import json
+from cloudinary.uploader import upload
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 def get_rand(length):
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
@@ -222,11 +226,8 @@ class UserLoginView(APIView):
         )
     
 class ContactView(APIView):
-    authentication_classes = [Authentication]
-    permission_classes = [IsAuthenticated]
-
     def get(self, request):
-        user = request.user
+        #user = request.user
         keyword = request.GET["search"]
         try:
             search_user = UserModel.objects.get(username=keyword)
@@ -234,25 +235,33 @@ class ContactView(APIView):
             return Response({"search_user": search_user.data}, status=200)
         except UserModel.DoesNotExist:
             return Response({"message": "User with the above username does not exist"}, status=400)
+        
+class ProfileImageView(APIView):
+    authentication_classes = [Authentication]
+    permission_classes = [IsAuthenticated]
 
-    """ def post(self, request):
+    def post(self, request):
         user = request.user
-        keyword = request.GET["add_user"]
-        user_data = UserModel.objects.get(user=user.id)
-        contact = user_data.contact_list
-        list_obj = ast.literal_eval(contact)
-        for obj in list_obj:
-            if keyword == obj["username"]:
-                return Response({"message": "Contact already added"}, status=404)
-            else:
-                continue
-        contact_user = UserModel.objects.get(username=keyword)
-        list_obj.append(UserSerializer(contact_user).data)
-        user_data.contact_list = str(list_obj)
-        user_data.save()
-        return Response({"contacts": ""}, status=200) """
-    
+        data = request.data
+        userdata = UserModel.objects.get(user=user.id)
+        userdata.profile_image = data['file']
+        userdata.save()
 
+        user_contact_list = PairModel.objects.filter(Q(sender=userdata) | Q(receiver=userdata))
+        
+        serialized_user = UserSerializer(userdata)
+        serialized_contact = PairSerializer(user_contact_list, many=True)
+
+        context = {
+            "user": serialized_user.data,
+            "contact_list": serialized_contact.data
+        }
+
+        context['user']["user_id"] = user.id,
+
+        return Response({"userData": context}, status=200)
+
+    
 class PairViewset(ModelViewSet):
     authentication_classes = [Authentication]
     permission_classes = [IsAuthenticated]
@@ -273,5 +282,108 @@ class PairViewset(ModelViewSet):
             PairModel.objects.create(sender=sender_user, receiver=contact_user)
             return Response({"message": "done"}, status=200)
         return Response({"message": "Pair already added"}, status=400)
-        
 
+    
+class PusherAuthView(APIView):
+    authentication_classes = [Authentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        print(request.user)
+        
+        pusher_client = pusher.Pusher(
+            app_id="1823396",
+            key="c28e46f783880b24243a",
+            secret='68165cd6b3265ca8b0c1',
+            cluster="sa1",
+            ssl=True
+        )
+
+        socket_id = request.data.get('socket_id')
+        channel_name = request.data.get('channel_name')
+        presence_data = {
+            'user_id': request.user.id,
+            'user_info': {
+                'name': request.user.username,
+            }
+        }
+        auth = pusher_client.authenticate(
+            channel=channel_name,
+            socket_id=socket_id,
+            custom_data=presence_data
+        )
+
+        return Response(auth)
+
+pusher_client = pusher.Pusher(
+  app_id="1823396",
+  key="c28e46f783880b24243a",
+  secret="68165cd6b3265ca8b0c1",
+  cluster="sa1",
+  ssl=True
+)
+def str_to_bool(value):
+    return value.lower() in ['true', '1', 't', 'y', 'yes']
+
+@method_decorator(csrf_exempt, name='dispatch')
+class RecordViewset(ModelViewSet):
+    authentication_classes = [Authentication]
+    permission_classes = [IsAuthenticated]
+
+    queryset = RecordModel.objects.all()
+    serializer_class = RecordSerializer
+
+
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        file_obj = request.data['file']
+        pair_id = request.data.get('pair_id')
+        delivered = request.data.get('delivered')
+        print(delivered)
+        user_data = UserModel.objects.get(user=user.id)
+
+        pair = PairModel.objects.get(id=pair_id)
+
+        upload_result = upload(
+            file_obj,
+            resource_type="auto"
+        )
+        file_url = upload_result['url']
+
+        record = RecordModel.objects.create(pair=pair, sender=user_data, audio_file=file_url, delivered=str_to_bool(delivered))
+        record.save()
+
+        pusher_client.trigger(f'presence-chat_{pair_id}', 'presence-chat-audio', {
+                'id': pair_id,
+                'channel_name': f"presence-chat_{pair_id}",
+                'content': file_url,
+                'sender': UserSerializer(user_data).data,
+            })
+        
+        return Response({"file_url": file_url}, status=200)
+
+
+class checkDelivered(APIView):
+    authentication_classes = [Authentication]
+    permission_classes = [IsAuthenticated]
+
+    serializer_class = RecordSerializer
+
+    def get(self, request):
+        user = request.user
+        undelivered = RecordModel.objects.filter(delivered=False)
+        for obj in undelivered:
+            if (obj.pair.receiver.user == user and obj.sender != user) or (obj.pair.sender.user == user and obj.sender != user):
+                obj_d = RecordSerializer(obj)
+                obj_d = obj_d.data
+                pusher_client.trigger(f"presence-chat_{obj_d['pair']}", 'presence-chat-audio', {
+                    'id': obj_d['pair'],
+                    'channel_name': f"presence-chat_{obj_d['pair']}",
+                    'content': obj_d['audio_file'],
+                    'sender': obj_d['sender'],
+                })
+                obj.delivered = True
+                obj.save()
+
+        return Response({"message": "All Messsages delivered"}, status=200)

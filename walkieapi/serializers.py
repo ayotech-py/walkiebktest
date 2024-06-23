@@ -17,3 +17,10 @@ class PairSerializer(serializers.ModelSerializer):
     class Meta: 
         model = PairModel
         fields = "__all__"
+
+class RecordSerializer(serializers.ModelSerializer):
+    sender = UserSerializer()
+
+    class Meta:
+        model = RecordModel
+        fields = "__all__"

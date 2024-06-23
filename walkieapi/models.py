@@ -43,3 +43,10 @@ class PairModel(models.Model):
     sender = models.OneToOneField(UserModel, on_delete=models.CASCADE, related_name="sender")
     receiver = models.OneToOneField(UserModel, on_delete=models.CASCADE, related_name="receiver")
     status = models.BooleanField(default=False)
+
+class RecordModel(models.Model):
+    pair = models.ForeignKey(PairModel, on_delete=models.CASCADE)
+    sender = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name="record_sender")
+    audio_file = models.URLField()
+    delivered = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)

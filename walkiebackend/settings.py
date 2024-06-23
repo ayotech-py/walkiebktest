@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -134,3 +138,32 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+MEDIA_URL = "walkie/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "walkie")
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+""" API_KEY = os.environ["API_KEY"]
+
+PUSHER_APP_ID=os.environ['PUSHER_APP_ID']
+PUSHER_KEY=os.environ['PUSHER_KEY']
+PUSHER_SECRET=os.environ['PUSHER_SECRET']
+PUSHER_CLUSTER=os.environ['PUSHER_CLUSTER']
+
+CLOUD_NAME = os.environ["CLOUD_NAME"]
+CLOUDINARY_API_KEY = os.environ['CLOUDINARY_API_KEY']
+API_SECRET = os.environ['API_SECRET'] """
+
+
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME" : "di040wc0d", 
+    "API_KEY" : "751378492874732", 
+    "API_SECRET" : "KhEyBsoNXPk-rUiSNTkkv-ecnz4"
+}
+
+cloudinary.config(
+    cloud_name=CLOUDINARY_STORAGE["CLOUD_NAME"],
+    api_key=CLOUDINARY_STORAGE["API_KEY"],
+    api_secret=CLOUDINARY_STORAGE["API_SECRET"]
+)
