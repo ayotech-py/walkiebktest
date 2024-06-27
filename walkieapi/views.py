@@ -347,6 +347,8 @@ class PairViewset(ModelViewSet):
 
         sender_id = PairModel.objects.get(id=pair_id).sender.id
 
+        print(PairModel.objects.get(id=pair_id).sender.id, PairModel.objects.get(id=pair_id).sender)
+
         pusher_client.trigger(f'private-user_{sender_id}', 'accept-request', {
             'message': 'Friend request accepted',
             'data': serializer.data
