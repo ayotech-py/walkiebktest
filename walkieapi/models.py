@@ -40,9 +40,11 @@ class UserModel(models.Model):
         return f"{self.email}"
     
 class PairModel(models.Model):
-    sender = models.OneToOneField(UserModel, on_delete=models.CASCADE, related_name="sender")
-    receiver = models.OneToOneField(UserModel, on_delete=models.CASCADE, related_name="receiver")
+    sender = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name="sender")
+    receiver = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name="receiver")
     status = models.BooleanField(default=False)
+    block = models.BooleanField(default=False)
+    accepted = models.BooleanField(default=False)
 
 class RecordModel(models.Model):
     pair = models.ForeignKey(PairModel, on_delete=models.CASCADE)

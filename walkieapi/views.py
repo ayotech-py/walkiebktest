@@ -21,6 +21,7 @@ from cloudinary.uploader import upload
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
+
 def get_rand(length):
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
@@ -39,6 +40,14 @@ def get_refresh_token():
         settings.SECRET_KEY,
         algorithm="HS256",
     )
+
+pusher_client = pusher.Pusher(
+  app_id="1823396",
+  key="c28e46f783880b24243a",
+  secret="68165cd6b3265ca8b0c1",
+  cluster="sa1",
+  ssl=True
+)
 
 class UserViewset(ModelViewSet):
     """ authentication_classes = [ApiKeyAuthentication] """
@@ -261,13 +270,35 @@ class ProfileImageView(APIView):
 
         return Response({"userData": context}, status=200)
 
-    
+def get_user_data(id):
+    receiver_user = UserModel.objects.get(id=id)
+    receiver_contact_list = PairModel.objects.filter(Q(sender=receiver_user) | Q(receiver=receiver_user))
+    serialized_receiver_user = UserSerializer(receiver_user)
+    serialized_receiver_contact_list = PairSerializer(receiver_contact_list, many=True)
+
+    receiver_context = {
+        "user": serialized_receiver_user.data,
+        "contact_list": serialized_receiver_contact_list.data
+    }
+
+    return(receiver_context)
+
+def get_online_users(channel_name):
+    response = pusher_client.channels_info([channel_name], info=['user_count', 'subscription_count'])
+    users = pusher_client.channel_users(channel_name)
+    return {
+        'status': 'success',
+        'users': users['users'],
+        'user_count': response['channels'][channel_name]['user_count'],
+        'subscription_count': response['channels'][channel_name]['subscription_count']
+    }
+
 class PairViewset(ModelViewSet):
     authentication_classes = [Authentication]
     permission_classes = [IsAuthenticated]
 
-    queryset = UserModel.objects.all()
-    serializer_class = UserSerializer
+    queryset = PairModel.objects.all()
+    serializer_class = PairSerializer
 
     def create(self, request, *args, **kwargs):
         user = request.user
@@ -279,18 +310,56 @@ class PairViewset(ModelViewSet):
         check_pair = PairModel.objects.filter(sender=sender_user, receiver=contact_user).exists()
         
         if not check_pair:
-            PairModel.objects.create(sender=sender_user, receiver=contact_user)
-            return Response({"message": "done"}, status=200)
+            PairModel.objects.create(sender=sender_user, receiver=contact_user).save()
+            user_contact_list = PairModel.objects.filter(Q(sender=user_data) | Q(receiver=user_data))
+            serialized_user = UserSerializer(user_data)
+            serialized_contact = PairSerializer(user_contact_list, many=True)
+            receiver_user_data = get_user_data(contact_user.id)
+
+            pusher_client.trigger(f'private-user_{contact_user.id}', 'friend-request', {
+                'from': sender_user.username,
+                'message': 'You have a new friend request!',
+                "userData": receiver_user_data
+            })
+
+            context = {
+                "user": serialized_user.data,
+                "contact_list": serialized_contact.data
+            }
+
+            context['user']["user_id"] = user.id,
+
+            return Response({"userData": context}, status=200)
         return Response({"message": "Pair already added"}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+
+        # Trigger Pusher event
+        pair_id = kwargs.get('pk')
+
+        sender_id = PairModel.objects.get(id=pair_id).sender.id
+
+        pusher_client.trigger(f'private-user_{sender_id}', 'accept-request', {
+            'message': 'Friend request accepted',
+            'data': serializer.data
+        })
+
+        return Response(serializer.data)
 
     
 class PusherAuthView(APIView):
     authentication_classes = [Authentication]
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, *args, **kwargs):
-        print(request.user)
-        
+    def post(self, request, *args, **kwargs):        
         pusher_client = pusher.Pusher(
             app_id="1823396",
             key="c28e46f783880b24243a",
@@ -315,13 +384,6 @@ class PusherAuthView(APIView):
 
         return Response(auth)
 
-pusher_client = pusher.Pusher(
-  app_id="1823396",
-  key="c28e46f783880b24243a",
-  secret="68165cd6b3265ca8b0c1",
-  cluster="sa1",
-  ssl=True
-)
 def str_to_bool(value):
     return value.lower() in ['true', '1', 't', 'y', 'yes']
 
@@ -333,14 +395,11 @@ class RecordViewset(ModelViewSet):
     queryset = RecordModel.objects.all()
     serializer_class = RecordSerializer
 
-
-
     def create(self, request, *args, **kwargs):
         user = request.user
         file_obj = request.data['file']
         pair_id = request.data.get('pair_id')
         delivered = request.data.get('delivered')
-        print(delivered)
         user_data = UserModel.objects.get(user=user.id)
 
         pair = PairModel.objects.get(id=pair_id)
@@ -359,6 +418,7 @@ class RecordViewset(ModelViewSet):
                 'channel_name': f"presence-chat_{pair_id}",
                 'content': file_url,
                 'sender': UserSerializer(user_data).data,
+                'created_at': RecordSerializer(record).data['created_at']
             })
         
         return Response({"file_url": file_url}, status=200)
@@ -373,8 +433,10 @@ class checkDelivered(APIView):
     def get(self, request):
         user = request.user
         undelivered = RecordModel.objects.filter(delivered=False)
+        falseStatuses = PairModel.objects.filter(status=False)
+        falseAccepted = PairModel.objects.filter(Q(status=True) & Q(accepted=False))
         for obj in undelivered:
-            if (obj.pair.receiver.user == user and obj.sender != user) or (obj.pair.sender.user == user and obj.sender != user):
+            if (obj.pair.receiver.user == user and obj.sender.email != user.email) or (obj.pair.sender.user == user and obj.sender.email != user.email):
                 obj_d = RecordSerializer(obj)
                 obj_d = obj_d.data
                 pusher_client.trigger(f"presence-chat_{obj_d['pair']}", 'presence-chat-audio', {
@@ -382,8 +444,31 @@ class checkDelivered(APIView):
                     'channel_name': f"presence-chat_{obj_d['pair']}",
                     'content': obj_d['audio_file'],
                     'sender': obj_d['sender'],
+                    'created_at': obj_d['created_at']
                 })
                 obj.delivered = True
                 obj.save()
+
+        for obj in falseStatuses:
+            if obj.receiver.user.email == user.email:
+                receiver_user_data = get_user_data(obj.receiver.id)
+                pusher_client.trigger(f'private-user_{obj.receiver.id}', 'friend-request', {
+                    'from': obj.sender.username,
+                    'message': 'You have a new friend request!',
+                    "userData": receiver_user_data
+                })
+
+        for obj in falseAccepted:
+            if obj.sender.user.email == user.email:
+                pair = PairModel.objects.get(id=obj.id)
+                sender_id = pair.sender.id
+                
+                pair.accepted = True
+                pair.save()
+                
+                pusher_client.trigger(f'private-user_{sender_id}', 'accept-request', {
+                    'message': 'PairModel updated',
+                    'data': PairSerializer(pair).data
+                })
 
         return Response({"message": "All Messsages delivered"}, status=200)
