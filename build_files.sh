@@ -3,9 +3,9 @@
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Download the ffmpeg static build using curl
-curl -L -o ffmpeg-release-64bit-static.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-64bit-static.tar.xz
-tar -xvf ffmpeg-release-64bit-static.tar.xz
+# Download the ffmpeg precompiled binary using curl
+curl -L -o ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-i686-static.tar.xz
+tar -xf ffmpeg.tar.xz
 cd ffmpeg-*-static
 
 # Move the ffmpeg binaries to /usr/local/bin
