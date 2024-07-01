@@ -10,5 +10,5 @@ mv ffprobe /usr/local/bin/ffprobe
 ls -l /usr/local/bin/ffmpeg
 ls -l /usr/local/bin/ffprobe
 
-# Collect static files
-python manage.py collectstatic --noinput
+
+
