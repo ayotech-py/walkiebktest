@@ -574,7 +574,7 @@ class TranslateView(APIView):
 
         print(f"initial langage: {language} target language: {target}")
 
-        file_name = 'uploaded_audio.mp3'
+        file_name = '/tmp/uploaded_audio.mp3'
 
         with open(file_name, 'wb+') as destination:
             for chunk in file_obj.chunks():
@@ -582,7 +582,7 @@ class TranslateView(APIView):
 
         try:
 
-            wav_file_name = 'converted_audio.wav'
+            wav_file_name = '/tmp/converted_audio.wav'
             subprocess.run(['ffmpeg', '-i', file_name, '-ar', '8000', '-ac', '1', '-c:a', 'pcm_mulaw', wav_file_name], check=True)
 
             response = transcribe_model_selection_v2(language=language, audio_path=wav_file_name)
@@ -599,7 +599,7 @@ class TranslateView(APIView):
             else:
                 ssml_gender = texttospeech.SsmlVoiceGender.MALE
 
-            output_file = 'output.mp3'
+            output_file = '/tmp/output.mp3'
             text_to_speech(text=translated_text, gender=ssml_gender)
 
             
@@ -647,7 +647,7 @@ def translate_text(target: str, text: str, source: str) -> dict:
 
     return result
 
-def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='output.mp3'):
+def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='/tmp/output.mp3'):
     credentials = service_account.Credentials.from_service_account_info(service_account_info)
     client = texttospeech.TextToSpeechClient(credentials=credentials)
 
