@@ -3,7 +3,12 @@
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Move the ffmpeg binaries to /usr/local/bin
-mv ffmpeg /usr/local/bin/
-mv ffprobe /usr/local/bin/
+mv ffmpeg /usr/local/bin/ffmpeg
+mv ffprobe /usr/local/bin/ffprobe
 
+# Verify that ffmpeg and ffprobe are installed correctly
+ls -l /usr/local/bin/ffmpeg
+ls -l /usr/local/bin/ffprobe
+
+# Collect static files
+python manage.py collectstatic --noinput
