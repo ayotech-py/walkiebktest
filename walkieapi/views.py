@@ -583,8 +583,12 @@ class TranslateView(APIView):
 
         try:
             ffmpeg_path = os.path.join(os.path.dirname(__file__), 'ffmpeg')
-            print("ffmpeg_path",ffmpeg_path)
+            ffprobe_path = os.path.join(os.path.dirname(__file__), 'ffprobe')
             AudioSegment.converter = ffmpeg_path
+            AudioSegment.ffprobe = ffprobe_path
+
+            print("ffmpeg_path",ffmpeg_path)
+            print("ffprobe_path",ffprobe_path)
 
             audio = AudioSegment.from_file(file_name, format="mp4")
             audio = audio.set_sample_width(2)
