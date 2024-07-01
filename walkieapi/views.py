@@ -583,7 +583,7 @@ class TranslateView(APIView):
         try:
 
             wav_file_name = '/tmp/converted_audio.wav'
-            subprocess.run(['/usr/local/bin/ffmpeg', '-i', file_name, '-ar', '8000', '-ac', '1', '-c:a', 'pcm_mulaw', wav_file_name], check=True)
+            subprocess.run(['/var/task/ffmpeg', '-i', file_name, '-ar', '8000', '-ac', '1', '-c:a', 'pcm_mulaw', wav_file_name], check=True)
 
             response = transcribe_model_selection_v2(language=language, audio_path=wav_file_name)
             
