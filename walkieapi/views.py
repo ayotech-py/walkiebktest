@@ -581,8 +581,26 @@ class TranslateView(APIView):
                 destination.write(chunk)
 
         try:
-
             wav_file_name = '/tmp/converted_audio.wav'
+
+            print("Contents of /var/task/:")
+            for root, dirs, files in os.walk("/var/task/"):
+                for name in files:
+                    print(os.path.join(root, name))
+                for name in dirs:
+                    print(os.path.join(root, name))
+            
+            # Check if ffmpeg and ffprobe exist and their permissions
+            print("Checking /var/task/ffmpeg:")
+            print(os.path.exists("/var/task/ffmpeg"))
+            print(os.path.isfile("/var/task/ffmpeg"))
+            print(oct(os.stat("/var/task/ffmpeg").st_mode))
+            
+            print("Checking /var/task/ffprobe:")
+            print(os.path.exists("/var/task/ffprobe"))
+            print(os.path.isfile("/var/task/ffprobe"))
+            print(oct(os.stat("/var/task/ffprobe").st_mode))
+
             subprocess.run(['/var/task/ffmpeg', '-i', file_name, '-ar', '8000', '-ac', '1', '-c:a', 'pcm_mulaw', wav_file_name], check=True)
 
             response = transcribe_model_selection_v2(language=language, audio_path=wav_file_name)
