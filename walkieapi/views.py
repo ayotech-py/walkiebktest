@@ -571,14 +571,14 @@ class TranslateView(APIView):
 
         print(f"initial langage: {language} target language: {target}")
 
-        file_name = 'uploaded_audio.mp3'
+        file_name = '/tmp/uploaded_audio.mp3'
 
         with open(file_name, 'wb+') as destination:
             for chunk in file_obj.chunks():
                 destination.write(chunk)
 
-        output_file = 'output.mp3'
-        wav_file_name = 'converted_audio.wav'
+        output_file = '/tmp/output.mp3'
+        wav_file_name = '/tmp/converted_audio.wav'
 
 
         try:
