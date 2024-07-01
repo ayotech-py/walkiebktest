@@ -657,7 +657,7 @@ def translate_text(target: str, text: str, source: str) -> dict:
 
     return result
 
-def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='output.mp3'):
+def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='/tmp/output.mp3'):
     credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
     client = texttospeech.TextToSpeechClient(credentials=credentials)
 
