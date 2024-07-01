@@ -1,8 +1,6 @@
 #!/bin/bash
 
 # Install Python dependencies
-pip install -r requirements.txt
-
 #mv ffmpeg /usr/local/bin/ffmpeg
 #mv ffprobe /usr/local/bin/ffprobe
 
@@ -15,6 +13,9 @@ rm /usr/local/bin/ffmpeg
 rm /usr/local/bin/ffprobe
 
 # Verify that ffmpeg and ffprobe are installed correctly
+
+pip install -r requirements.txt
+
 
 
 
