@@ -626,7 +626,7 @@ class TranslateView(APIView):
             os.remove(wav_file_name)
             os.remove(file_name)
             os.remove(output_file)
-            return Response("An error occured", status=400)
+            return Response({"error": "An error occured"}, status=400)
 
 
 
