@@ -29,8 +29,8 @@ import os
 from gtts import gTTS
 from google.cloud import texttospeech
 import html
-import os
-import json
+
+import pydub
 
 
 
@@ -60,11 +60,6 @@ pusher_client = pusher.Pusher(
   cluster="sa1",
   ssl=True
 )
-
-encoded_credentials = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
-decoded_credentials = base64.b64decode(encoded_credentials)
-service_account_info = json.loads(decoded_credentials)
-
 
 class UserViewset(ModelViewSet):
     """ authentication_classes = [ApiKeyAuthentication] """
@@ -533,7 +528,7 @@ class checkDelivered(APIView):
 from google.cloud import speech
 
 def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speech.RecognizeResponse:
-    credentials = service_account.Credentials.from_service_account_info(service_account_info)
+    credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
     client = speech.SpeechClient(credentials=credentials)
 
     with open(audio_path, "rb") as f:
@@ -542,7 +537,7 @@ def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speec
     audio = speech.RecognitionAudio(content=content)
 
     config = speech.RecognitionConfig(
-        encoding=speech.RecognitionConfig.AudioEncoding.MULAW,
+        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=8000,
         language_code=language,
         model="default",
@@ -561,6 +556,8 @@ def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speec
     
     return response
 
+from pydub import AudioSegment
+
 
 class TranslateView(APIView):
     parser_classes = (MultiPartParser, FormParser)
@@ -574,41 +571,27 @@ class TranslateView(APIView):
 
         print(f"initial langage: {language} target language: {target}")
 
-        file_name = '/tmp/uploaded_audio.mp3'
+        file_name = 'uploaded_audio.mp3'
 
         with open(file_name, 'wb+') as destination:
             for chunk in file_obj.chunks():
                 destination.write(chunk)
 
+        output_file = 'output.mp3'
+        wav_file_name = 'converted_audio.wav'
+
+
         try:
-            wav_file_name = '/tmp/converted_audio.wav'
+            ffmpeg_path = os.path.join(os.path.dirname(__file__), 'ffmpeg')
+            print("ffmpeg_path",ffmpeg_path)
+            AudioSegment.converter = ffmpeg_path
 
-            # Set the path to the ffmpeg and ffprobe binaries
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            ffmpeg_path = os.path.join(base_dir, 'ffmpeg')
-            ffprobe_path = os.path.join(base_dir, 'ffprobe')
-
-            # Print the contents of the walkieapi directory for debugging
-            print("Contents of walkieapi directory:")
-            for root, dirs, files in os.walk(base_dir):
-                for name in files:
-                    print(os.path.join(root, name))
-                for name in dirs:
-                    print(os.path.join(root, name))
-
-            # Check if ffmpeg and ffprobe exist and their permissions
-            print("Checking ffmpeg_path:", ffmpeg_path)
-            print(os.path.exists(ffmpeg_path))
-            print(os.path.isfile(ffmpeg_path))
-            print(oct(os.stat(ffmpeg_path).st_mode))
-
-            print("Checking ffprobe_path:", ffprobe_path)
-            print(os.path.exists(ffprobe_path))
-            print(os.path.isfile(ffprobe_path))
-            print(oct(os.stat(ffprobe_path).st_mode))
+            audio = AudioSegment.from_file(file_name, format="mp4")
+            audio = audio.set_sample_width(2)
+            audio.export(wav_file_name, format="wav")
 
 
-            subprocess.run([ffmpeg_path, '-i', file_name, '-ar', '8000', '-ac', '1', '-c:a', 'pcm_mulaw', wav_file_name], check=True)
+            #subprocess.run(['ffmpeg', '-i', file_name, '-ar', '8000', '-ac', '1', '-c:a', 'pcm_mulaw', wav_file_name], check=True)
 
             response = transcribe_model_selection_v2(language=language, audio_path=wav_file_name)
             
@@ -624,9 +607,7 @@ class TranslateView(APIView):
             else:
                 ssml_gender = texttospeech.SsmlVoiceGender.MALE
 
-            output_file = '/tmp/output.mp3'
             text_to_speech(text=translated_text, gender=ssml_gender)
-
             
 
             upload_result = upload(
@@ -651,13 +632,13 @@ class TranslateView(APIView):
             os.remove(wav_file_name)
             os.remove(file_name)
             os.remove(output_file)
-            return Response({"error": "An error occured"}, status=400)
+            return Response("An error occured", status=400)
 
 
 
 def translate_text(target: str, text: str, source: str) -> dict:
     from google.cloud import translate_v2 as translate
-    credentials = service_account.Credentials.from_service_account_info(service_account_info)
+    credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
 
     translate_client = translate.Client(credentials=credentials)
 
@@ -672,8 +653,8 @@ def translate_text(target: str, text: str, source: str) -> dict:
 
     return result
 
-def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='/tmp/output.mp3'):
-    credentials = service_account.Credentials.from_service_account_info(service_account_info)
+def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='output.mp3'):
+    credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
     client = texttospeech.TextToSpeechClient(credentials=credentials)
 
     input_text = texttospeech.SynthesisInput(text=text)
