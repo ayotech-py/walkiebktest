@@ -583,25 +583,32 @@ class TranslateView(APIView):
         try:
             wav_file_name = '/tmp/converted_audio.wav'
 
-            print("Contents of /var/task/:")
-            for root, dirs, files in os.walk("/var/task/"):
+            # Set the path to the ffmpeg and ffprobe binaries
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            ffmpeg_path = os.path.join(base_dir, 'ffmpeg')
+            ffprobe_path = os.path.join(base_dir, 'ffprobe')
+
+            # Print the contents of the walkieapi directory for debugging
+            print("Contents of walkieapi directory:")
+            for root, dirs, files in os.walk(base_dir):
                 for name in files:
                     print(os.path.join(root, name))
                 for name in dirs:
                     print(os.path.join(root, name))
-            
-            # Check if ffmpeg and ffprobe exist and their permissions
-            print("Checking /var/task/ffmpeg:")
-            print(os.path.exists("/var/task/ffmpeg"))
-            print(os.path.isfile("/var/task/ffmpeg"))
-            print(oct(os.stat("/var/task/ffmpeg").st_mode))
-            
-            print("Checking /var/task/ffprobe:")
-            print(os.path.exists("/var/task/ffprobe"))
-            print(os.path.isfile("/var/task/ffprobe"))
-            print(oct(os.stat("/var/task/ffprobe").st_mode))
 
-            subprocess.run(['/var/task/ffmpeg', '-i', file_name, '-ar', '8000', '-ac', '1', '-c:a', 'pcm_mulaw', wav_file_name], check=True)
+            # Check if ffmpeg and ffprobe exist and their permissions
+            print("Checking ffmpeg_path:", ffmpeg_path)
+            print(os.path.exists(ffmpeg_path))
+            print(os.path.isfile(ffmpeg_path))
+            print(oct(os.stat(ffmpeg_path).st_mode))
+
+            print("Checking ffprobe_path:", ffprobe_path)
+            print(os.path.exists(ffprobe_path))
+            print(os.path.isfile(ffprobe_path))
+            print(oct(os.stat(ffprobe_path).st_mode))
+
+
+            subprocess.run([ffmpeg_path, '-i', file_name, '-ar', '8000', '-ac', '1', '-c:a', 'pcm_mulaw', wav_file_name], check=True)
 
             response = transcribe_model_selection_v2(language=language, audio_path=wav_file_name)
             
