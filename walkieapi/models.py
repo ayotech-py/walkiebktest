@@ -29,6 +29,7 @@ class UserModel(models.Model):
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=20, null=True)
     address = models.CharField(max_length=255, null=True)
+    language = models.CharField(max_length=10, default='en-NG')
     gender = models.CharField(
         max_length=1,
         validators=[validate_gender],
@@ -50,5 +51,7 @@ class RecordModel(models.Model):
     pair = models.ForeignKey(PairModel, on_delete=models.CASCADE)
     sender = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name="record_sender")
     audio_file = models.URLField()
+    language = models.CharField(max_length=255, default='en-NG')
+    trans_language = models.URLField()
     delivered = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

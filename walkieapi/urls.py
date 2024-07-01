@@ -14,5 +14,6 @@ urlpatterns = [
     path("contact-api/", ContactView.as_view()),
     path("photo-api/", ProfileImageView.as_view()),
     path("pusher-auth/", PusherAuthView.as_view()),
-    path("check-undelivered/", checkDelivered.as_view())
+    path("check-undelivered/", checkDelivered.as_view()),
+    path("translate-audio/", TranslateView.as_view())
 ]

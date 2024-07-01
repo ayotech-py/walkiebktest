@@ -20,6 +20,18 @@ import json
 from cloudinary.uploader import upload
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from google.oauth2 import service_account
+from google.cloud import speech_v2
+from google.cloud.speech_v2.types import cloud_speech
+from rest_framework.parsers import MultiPartParser, FormParser
+import subprocess
+import os
+from gtts import gTTS
+from google.cloud import texttospeech
+import html
+import os
+import json
+
 
 
 def get_rand(length):
@@ -48,6 +60,11 @@ pusher_client = pusher.Pusher(
   cluster="sa1",
   ssl=True
 )
+
+encoded_credentials = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+decoded_credentials = base64.b64decode(encoded_credentials)
+service_account_info = json.loads(decoded_credentials)
+
 
 class UserViewset(ModelViewSet):
     """ authentication_classes = [ApiKeyAuthentication] """
@@ -329,6 +346,8 @@ class PairViewset(ModelViewSet):
 
             context['user']["user_id"] = user.id,
 
+            print(context)
+
             return Response({"userData": context}, status=200)
         return Response({"message": "Pair already added"}, status=400)
 
@@ -345,14 +364,26 @@ class PairViewset(ModelViewSet):
         # Trigger Pusher event
         pair_id = kwargs.get('pk')
 
-        sender_id = PairModel.objects.get(id=pair_id).sender.id
+        pair = PairModel.objects.get(id=pair_id)
 
-        print(PairModel.objects.get(id=pair_id).sender.id, PairModel.objects.get(id=pair_id).sender)
+        user_data = UserModel.objects.get(id=pair.sender.id)
+        user_contact_list = PairModel.objects.filter(Q(sender=user_data) | Q(receiver=user_data))
 
-        pusher_client.trigger(f'private-user_{sender_id}', 'accept-request', {
+        serialized_user = UserSerializer(user_data)
+        serialized_contact = PairSerializer(user_contact_list, many=True)
+
+
+        context = {
+            "user": serialized_user.data,
+            "contact_list": serialized_contact.data
+        }        
+
+        pusher_client.trigger(f'private-user_{pair.sender.id}', 'accept-request', {
             'message': 'Friend request accepted',
-            'data': serializer.data
+            'userData': context
         })
+
+        print("Request data", serializer.data)
 
         return Response(serializer.data)
 
@@ -389,6 +420,7 @@ class PusherAuthView(APIView):
 def str_to_bool(value):
     return value.lower() in ['true', '1', 't', 'y', 'yes']
 
+
 @method_decorator(csrf_exempt, name='dispatch')
 class RecordViewset(ModelViewSet):
     authentication_classes = [Authentication]
@@ -402,7 +434,10 @@ class RecordViewset(ModelViewSet):
         file_obj = request.data['file']
         pair_id = request.data.get('pair_id')
         delivered = request.data.get('delivered')
+        language = request.data.get('lang')
         user_data = UserModel.objects.get(user=user.id)
+
+        print(language)
 
         pair = PairModel.objects.get(id=pair_id)
 
@@ -411,16 +446,19 @@ class RecordViewset(ModelViewSet):
             resource_type="auto"
         )
         file_url = upload_result['url']
+        
 
-        record = RecordModel.objects.create(pair=pair, sender=user_data, audio_file=file_url, delivered=str_to_bool(delivered))
+        record = RecordModel.objects.create(pair=pair, sender=user_data, audio_file=file_url, delivered=str_to_bool(delivered), language=language)
         record.save()
 
-        pusher_client.trigger(f'presence-chat_{pair_id}', 'presence-chat-audio', {
+        pusher_client.trigger(f'presence-chat_walkie', 'presence-chat-audio', {
                 'id': pair_id,
-                'channel_name': f"presence-chat_{pair_id}",
+                'channel_name': f"presence-chat_walkie",
                 'content': file_url,
                 'sender': UserSerializer(user_data).data,
-                'created_at': RecordSerializer(record).data['created_at']
+                'created_at': RecordSerializer(record).data['created_at'],
+                "language": language,
+                "record_id": record.id
             })
         
         return Response({"file_url": file_url}, status=200)
@@ -434,43 +472,202 @@ class checkDelivered(APIView):
 
     def get(self, request):
         user = request.user
-        undelivered = RecordModel.objects.filter(delivered=False)
-        falseStatuses = PairModel.objects.filter(status=False)
-        falseAccepted = PairModel.objects.filter(Q(status=True) & Q(accepted=False))
+
+        # Fetch all relevant undelivered records in one query
+        undelivered = RecordModel.objects.filter(
+            delivered=False
+        ).filter(
+            Q(pair__receiver__user=user) | Q(pair__sender__user=user)
+        ).exclude(
+            sender__email=user.email
+        )
+
+        # Process and deliver undelivered records
+        undelivered_ids = []
         for obj in undelivered:
-            if (obj.pair.receiver.user == user and obj.sender.email != user.email) or (obj.pair.sender.user == user and obj.sender.email != user.email):
-                obj_d = RecordSerializer(obj)
-                obj_d = obj_d.data
-                pusher_client.trigger(f"presence-chat_{obj_d['pair']}", 'presence-chat-audio', {
-                    'id': obj_d['pair'],
-                    'channel_name': f"presence-chat_{obj_d['pair']}",
-                    'content': obj_d['audio_file'],
-                    'sender': obj_d['sender'],
-                    'created_at': obj_d['created_at']
-                })
-                obj.delivered = True
-                obj.save()
+            obj_d = RecordSerializer(obj).data
+            pusher_client.trigger(f"presence-chat_walkie", 'presence-chat-audio', {
+                'id': obj_d['pair'],
+                'channel_name': f"presence-chat_walkie",
+                'content': obj_d['audio_file'],
+                'sender': obj_d['sender'],
+                'created_at': obj_d['created_at'],
+                "language": obj_d['language'],
+                "record_id": obj_d['id'],
+            })
+            undelivered_ids.append(obj.id)
 
+        # Bulk update delivered status
+        RecordModel.objects.filter(id__in=undelivered_ids).update(delivered=True)
+
+        # Fetch all relevant PairModel objects in one query
+        falseStatuses = PairModel.objects.filter(status=False, receiver__user__email=user.email)
+        falseAccepted = PairModel.objects.filter(status=True, accepted=False, sender__user__email=user.email)
+
+        # Process false statuses
         for obj in falseStatuses:
-            if obj.receiver.user.email == user.email:
-                receiver_user_data = get_user_data(obj.receiver.id)
-                pusher_client.trigger(f'private-user_{obj.receiver.id}', 'friend-request', {
-                    'from': obj.sender.username,
-                    'message': 'You have a new friend request!',
-                    "userData": receiver_user_data
-                })
+            receiver_user_data = get_user_data(obj.receiver.id)
+            pusher_client.trigger(f'private-user_{obj.receiver.id}', 'friend-request', {
+                'from': obj.sender.username,
+                'message': 'You have a new friend request!',
+                "userData": receiver_user_data
+            })
 
+        # Process false accepted
         for obj in falseAccepted:
-            if obj.sender.user.email == user.email:
-                pair = PairModel.objects.get(id=obj.id)
-                sender_id = pair.sender.id
-                
-                pair.accepted = True
-                pair.save()
-                
-                pusher_client.trigger(f'private-user_{sender_id}', 'accept-request', {
-                    'message': 'PairModel updated',
-                    'data': PairSerializer(pair).data
-                })
+            pair = PairModel.objects.get(id=obj.id)
+            sender_id = pair.sender.id
+            pair.accepted = True
+            pair.save()
 
-        return Response({"message": "All Messsages delivered"}, status=200)
+            receiver_user_data = get_user_data(sender_id)
+
+            pusher_client.trigger(f'private-user_{sender_id}', 'accept-request', {
+                'message': 'PairModel updated',
+                "userData": receiver_user_data
+            })
+
+        return Response({"message": "All Messages delivered"}, status=200)
+    
+
+from google.cloud import speech
+
+def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speech.RecognizeResponse:
+    credentials = service_account.Credentials.from_service_account_info(service_account_info)
+    client = speech.SpeechClient(credentials=credentials)
+
+    with open(audio_path, "rb") as f:
+        content = f.read()
+
+    audio = speech.RecognitionAudio(content=content)
+
+    config = speech.RecognitionConfig(
+        encoding=speech.RecognitionConfig.AudioEncoding.MULAW,
+        sample_rate_hertz=8000,
+        language_code=language,
+        model="default",
+        audio_channel_count=1,
+        enable_word_time_offsets=True,
+        enable_automatic_punctuation=True,
+        use_enhanced=True,
+        profanity_filter=True, 
+        alternative_language_codes=["yo", "en", 'ig', 'ha'],
+    )
+
+    operation = client.long_running_recognize(config=config, audio=audio)
+
+    print("Waiting for operation to complete...")
+    response = operation.result(timeout=90)
+    
+    return response
+
+
+class TranslateView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request):
+        file_obj = request.data['file']
+        language = request.data['lang']
+        target = request.data['target']
+        gender = request.data['gender']
+        record_id = request.data['record_id']
+
+        print(f"initial langage: {language} target language: {target}")
+
+        file_name = 'uploaded_audio.mp3'
+
+        with open(file_name, 'wb+') as destination:
+            for chunk in file_obj.chunks():
+                destination.write(chunk)
+
+        try:
+
+            wav_file_name = 'converted_audio.wav'
+            subprocess.run(['ffmpeg', '-i', file_name, '-ar', '8000', '-ac', '1', '-c:a', 'pcm_mulaw', wav_file_name], check=True)
+
+            response = transcribe_model_selection_v2(language=language, audio_path=wav_file_name)
+            
+            transcription = ''
+            for result in response.results:
+                transcription += result.alternatives[0].transcript
+
+            trans_text = translate_text(target=target, text=transcription, source=language.replace('-NG', ''))
+            translated_text = html.unescape(trans_text['translatedText'])
+
+            if gender == 'FEMALE':
+                ssml_gender = texttospeech.SsmlVoiceGender.FEMALE
+            else:
+                ssml_gender = texttospeech.SsmlVoiceGender.MALE
+
+            output_file = 'output.mp3'
+            text_to_speech(text=translated_text, gender=ssml_gender)
+
+            
+
+            upload_result = upload(
+                output_file,
+                resource_type="auto"
+            )
+            file_url = upload_result['url']
+
+            record = RecordModel.objects.get(id=record_id)
+            record.trans_language = file_url
+            record.save()
+
+            context = {
+                "file_url": file_url,
+                "text_translate": trans_text,
+            }
+            os.remove(wav_file_name)
+            os.remove(file_name)
+            os.remove(output_file)
+            return Response(context, status=200)
+        except Exception as e:
+            os.remove(wav_file_name)
+            os.remove(file_name)
+            os.remove(output_file)
+            return Response("An error occured", status=400)
+
+
+
+def translate_text(target: str, text: str, source: str) -> dict:
+    from google.cloud import translate_v2 as translate
+    credentials = service_account.Credentials.from_service_account_info(service_account_info)
+
+    translate_client = translate.Client(credentials=credentials)
+
+    if isinstance(text, bytes):
+        text = text.decode("utf-8")
+
+    result = translate_client.translate(text, target_language=target, source_language=source)
+
+    print("Text: {}".format(result["input"]))
+    print("Translation: {}".format(result["translatedText"]))
+    print("Detected source language: {}".format(source))
+
+    return result
+
+def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='output.mp3'):
+    credentials = service_account.Credentials.from_service_account_info(service_account_info)
+    client = texttospeech.TextToSpeechClient(credentials=credentials)
+
+    input_text = texttospeech.SynthesisInput(text=text)
+
+    voice = texttospeech.VoiceSelectionParams(
+        language_code=lang,
+        ssml_gender=gender
+    )
+
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3
+    )
+
+    response = client.synthesize_speech(
+        input=input_text,
+        voice=voice,
+        audio_config=audio_config
+    )
+
+    with open(output_file, 'wb') as out:
+        out.write(response.audio_content)
+        print(f'Audio content written to {output_file}')
