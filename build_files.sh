@@ -4,22 +4,16 @@
 pip install -r requirements.txt
 
 # Download the ffmpeg precompiled binary using curl
-curl -L -o ffmpeg-release-64bit-static.zip https://github.com/GyanD/codexffmpeg/releases/download/5.0/ffmpeg-5.0-essentials_build.zip
+curl -L -o ffmpeg-release-64bit-static.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n4.3.1-2-gd455e4a3ca-win64-static.zip
 unzip ffmpeg-release-64bit-static.zip
 
-# List the contents of the extracted directory
+# List the contents of the extracted directory to verify the structure
 echo "Listing contents of extracted directory:"
-ls -R ffmpeg-5.0-essentials_build
-
-# Navigate to the correct directory
-cd ffmpeg-5.0-essentials_build/bin
+ls -R .
 
 # Move the ffmpeg binaries to /usr/local/bin
-mv ffmpeg /usr/local/bin/
-mv ffprobe /usr/local/bin/
-
-# Return to project root directory
-cd ../..
+mv ffmpeg-n4.3.1-2-gd455e4a3ca-win64-static/bin/ffmpeg.exe /usr/local/bin/
+mv ffmpeg-n4.3.1-2-gd455e4a3ca-win64-static/bin/ffprobe.exe /usr/local/bin/
 
 # Collect static files
 python manage.py collectstatic --noinput
