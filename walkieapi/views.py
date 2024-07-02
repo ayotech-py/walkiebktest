@@ -616,13 +616,11 @@ class TranslateView(APIView):
             os.remove(file_name)
             os.remove(output_file)
             return Response("An error occured", status=400)
-
-
+            
+from google.cloud import translate_v2 as translate
 
 def translate_text(target: str, text: str, source: str) -> dict:
-    from google.cloud import translate_v2 as translate
-    credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
-
+    credentials = service_account.Credentials.from_service_account_info(service_account_info)
     translate_client = translate.Client(credentials=credentials)
 
     if isinstance(text, bytes):
@@ -637,7 +635,7 @@ def translate_text(target: str, text: str, source: str) -> dict:
     return result
 
 def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='/tmp/output.mp3'):
-    credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
+    credentials = service_account.Credentials.from_service_account_info(service_account_info)
     client = texttospeech.TextToSpeechClient(credentials=credentials)
 
     input_text = texttospeech.SynthesisInput(text=text)
