@@ -4,8 +4,7 @@
 
 pip install -r requirements.txt
 
-ffdl install -y
-
+ffdl install --add-path -y
 
 
 
