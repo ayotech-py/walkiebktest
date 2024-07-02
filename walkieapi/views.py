@@ -58,6 +58,10 @@ pusher_client = pusher.Pusher(
   ssl=True
 )
 
+encoded_credentials = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+decoded_credentials = base64.b64decode(encoded_credentials)
+service_account_info = json.loads(decoded_credentials)
+
 class UserViewset(ModelViewSet):
     """ authentication_classes = [ApiKeyAuthentication] """
 
@@ -523,7 +527,7 @@ class checkDelivered(APIView):
 from google.cloud import speech
 
 def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speech.RecognizeResponse:
-    credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
+    credentials = service_account.Credentials.from_service_account_info(service_account_info)
     client = speech.SpeechClient(credentials=credentials)
 
     with open(audio_path, "rb") as f:
@@ -611,13 +615,11 @@ class TranslateView(APIView):
             os.remove(file_name)
             os.remove(output_file)
             return Response("An error occured", status=400)
-
-
+            
+from google.cloud import translate_v2 as translate
 
 def translate_text(target: str, text: str, source: str) -> dict:
-    from google.cloud import translate_v2 as translate
-    credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
-
+    credentials = service_account.Credentials.from_service_account_info(service_account_info)
     translate_client = translate.Client(credentials=credentials)
 
     if isinstance(text, bytes):
@@ -632,7 +634,7 @@ def translate_text(target: str, text: str, source: str) -> dict:
     return result
 
 def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='/tmp/output.mp3'):
-    credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
+    credentials = service_account.Credentials.from_service_account_info(service_account_info)
     client = texttospeech.TextToSpeechClient(credentials=credentials)
 
     input_text = texttospeech.SynthesisInput(text=text)
