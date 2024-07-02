@@ -30,9 +30,6 @@ from gtts import gTTS
 from google.cloud import texttospeech
 import html
 
-import pydub
-
-
 
 def get_rand(length):
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
@@ -432,13 +429,12 @@ class RecordViewset(ModelViewSet):
         language = request.data.get('lang')
         user_data = UserModel.objects.get(user=user.id)
 
-        print(language)
-
         pair = PairModel.objects.get(id=pair_id)
 
         upload_result = upload(
             file_obj,
-            resource_type="auto"
+            resource_type="video",
+            format="wav"
         )
         file_url = upload_result['url']
         
@@ -556,11 +552,6 @@ def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speec
     
     return response
 
-from pydub import AudioSegment
-from ffmpeg_downloader import ffdl
-import ffmpeg_downloader
-ffmpeg_downloader.add_path()
-
 class TranslateView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
@@ -580,27 +571,10 @@ class TranslateView(APIView):
                 destination.write(chunk)
 
         output_file = '/tmp/output.mp3'
-        wav_file_name = '/tmp/converted_audio.wav'
 
 
         try:
-            """ ffmpeg_path = os.path.join(os.path.dirname(__file__), 'ffmpeg')
-            ffprobe_path = os.path.join(os.path.dirname(__file__), 'ffprobe')
-            AudioSegment.ffmpeg = ffmpeg_path
-            AudioSegment.converter = ffmpeg_path
-            AudioSegment.ffprobe = ffprobe_path """
-
-            #print("ffmpeg_path",ffmpeg_path)
-            #print("ffprobe_path",ffprobe_path)
-
-            audio = AudioSegment.from_file(file_name, format="mp4")
-            audio = audio.set_sample_width(2)
-            audio.export(wav_file_name, format="wav")
-
-
-            #subprocess.run(['ffmpeg', '-i', file_name, '-ar', '8000', '-ac', '1', '-c:a', 'pcm_mulaw', wav_file_name], check=True)
-
-            response = transcribe_model_selection_v2(language=language, audio_path=wav_file_name)
+            response = transcribe_model_selection_v2(language=language, audio_path=file_name)
             
             transcription = ''
             for result in response.results:
@@ -631,12 +605,10 @@ class TranslateView(APIView):
                 "file_url": file_url,
                 "text_translate": trans_text,
             }
-            os.remove(wav_file_name)
             os.remove(file_name)
             os.remove(output_file)
             return Response(context, status=200)
         except Exception as e:
-            os.remove(wav_file_name)
             os.remove(file_name)
             os.remove(output_file)
             return Response("An error occured", status=400)
