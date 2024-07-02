@@ -51,10 +51,10 @@ def get_refresh_token():
     )
 
 pusher_client = pusher.Pusher(
-  app_id="1823396",
-  key="c28e46f783880b24243a",
-  secret="68165cd6b3265ca8b0c1",
-  cluster="sa1",
+  app_id='1828071',
+  key='431004fa41f035822549',
+  secret='812e5e84405a5246d31d',
+  cluster='eu',
   ssl=True
 )
 
@@ -385,14 +385,6 @@ class PusherAuthView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):        
-        pusher_client = pusher.Pusher(
-            app_id="1823396",
-            key="c28e46f783880b24243a",
-            secret='68165cd6b3265ca8b0c1',
-            cluster="sa1",
-            ssl=True
-        )
-
         socket_id = request.data.get('socket_id')
         channel_name = request.data.get('channel_name')
         presence_data = {
@@ -425,7 +417,7 @@ class RecordViewset(ModelViewSet):
         user = request.user
         file_obj = request.data['file']
         pair_id = request.data.get('pair_id')
-        delivered = request.data.get('delivered')
+        receiver_id = request.data.get('receiver_id')
         language = request.data.get('lang')
         user_data = UserModel.objects.get(user=user.id)
 
@@ -437,9 +429,16 @@ class RecordViewset(ModelViewSet):
             format="wav"
         )
         file_url = upload_result['url']
+
+        members = pusher_client.users_info('presence-chat_walkie')
+        delivered = False
+        print("Online members:", members)
+        if receiver_id:
+            delivered = check_id_exists(users=members['users'], id_to_check=receiver_id)
+            print("Delivered", delivered)
         
 
-        record = RecordModel.objects.create(pair=pair, sender=user_data, audio_file=file_url, delivered=str_to_bool(delivered), language=language)
+        record = RecordModel.objects.create(pair=pair, sender=user_data, audio_file=file_url, delivered=delivered, language=language)
         record.save()
 
         pusher_client.trigger(f'presence-chat_walkie', 'presence-chat-audio', {
