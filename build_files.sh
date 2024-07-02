@@ -12,13 +12,13 @@ FFMPEG_URL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-${OS_TYPE}-
 mkdir -p ffmpeg
 cd ffmpeg
 
-# Download and extract FFmpeg
-wget $FFMPEG_URL -O ffmpeg.tar.xz
+# Download and extract FFmpeg using curl
+curl -L $FFMPEG_URL -o ffmpeg.tar.xz
 tar -xvf ffmpeg.tar.xz --strip-components=1
 
 # Make FFmpeg and FFprobe available in the PATH
 export PATH=$PATH:$(pwd)
 
 # Verify the installation
-ffmpeg -version
-ffprobe -version
+./ffmpeg -version
+./ffprobe -version
