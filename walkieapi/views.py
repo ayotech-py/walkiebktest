@@ -58,6 +58,10 @@ pusher_client = pusher.Pusher(
   ssl=True
 )
 
+encoded_credentials = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+decoded_credentials = base64.b64decode(encoded_credentials)
+service_account_info = json.loads(decoded_credentials)
+
 class UserViewset(ModelViewSet):
     """ authentication_classes = [ApiKeyAuthentication] """
 
@@ -524,7 +528,7 @@ class checkDelivered(APIView):
 from google.cloud import speech
 
 def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speech.RecognizeResponse:
-    credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
+    credentials = service_account.Credentials.from_service_account_info(service_account_info)
     client = speech.SpeechClient(credentials=credentials)
 
     with open(audio_path, "rb") as f:
