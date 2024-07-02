@@ -169,3 +169,6 @@ cloudinary.config(
     api_key=CLOUDINARY_STORAGE["API_KEY"],
     api_secret=CLOUDINARY_STORAGE["API_SECRET"]
 )
+
+import ffmpeg_downloader
+ffmpeg_downloader.add_path()

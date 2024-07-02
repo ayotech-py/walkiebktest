@@ -4,8 +4,7 @@
 
 pip install -r requirements.txt
 
-chmod +x ./walkieapi/ffmpeg
-chmod +x ./walkieapi/ffprobe
+ffdl install -y
 
 
 

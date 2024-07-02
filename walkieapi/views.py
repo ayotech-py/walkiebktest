@@ -557,7 +557,9 @@ def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speec
     return response
 
 from pydub import AudioSegment
-
+from ffmpeg_downloader import ffdl
+import ffmpeg_downloader
+ffmpeg_downloader.add_path()
 
 class TranslateView(APIView):
     parser_classes = (MultiPartParser, FormParser)
@@ -580,16 +582,16 @@ class TranslateView(APIView):
         output_file = '/tmp/output.mp3'
         wav_file_name = '/tmp/converted_audio.wav'
 
-        ffmpeg_path = os.path.join(os.path.dirname(__file__), 'ffmpeg')
-        ffprobe_path = os.path.join(os.path.dirname(__file__), 'ffprobe')
 
-        print("ffmpeg_path",ffmpeg_path)
-        print("ffprobe_path",ffprobe_path)
-        
         try:
+            """ ffmpeg_path = os.path.join(os.path.dirname(__file__), 'ffmpeg')
+            ffprobe_path = os.path.join(os.path.dirname(__file__), 'ffprobe')
+            AudioSegment.ffmpeg = ffmpeg_path
             AudioSegment.converter = ffmpeg_path
-            AudioSegment.ffprobe = ffprobe_path
+            AudioSegment.ffprobe = ffprobe_path """
 
+            #print("ffmpeg_path",ffmpeg_path)
+            #print("ffprobe_path",ffprobe_path)
 
             audio = AudioSegment.from_file(file_name, format="mp4")
             audio = audio.set_sample_width(2)
