@@ -36,6 +36,7 @@ class UserModel(models.Model):
         help_text='Use "F" for female or "M" for male.',
     )
     profile_image = models.ImageField(upload_to="profile_images/", default=None)
+    notification_token = models.CharField(max_length=255)
 
     def __str__(self):
         return f"{self.email}"
@@ -55,3 +56,7 @@ class RecordModel(models.Model):
     trans_language = models.URLField()
     delivered = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+""" class ExpoTokenModel(models.Model):
+    expo_user = models.OneToOneField(UserModel, on_delete=models.CASCADE)
+    token = models.CharField(max_length=255) """

@@ -29,6 +29,8 @@ import os
 from gtts import gTTS
 from google.cloud import texttospeech
 import html
+import requests
+
 
 
 def get_rand(length):
@@ -57,6 +59,13 @@ pusher_client = pusher.Pusher(
   cluster='eu',
   ssl=True
 )
+
+def send_notification(token, msg, body, username):
+    print("receipient", username)
+    url = "https://exp.host/--/api/v2/push/send"
+    headers = {"Content-Type": "application/json"}
+    data = {"to": token, "title": msg, "body": body, "data": {"username": username}}
+    requests.post(url, headers=headers, data=json.dumps(data))
 
 encoded_credentials = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
 decoded_credentials = base64.b64decode(encoded_credentials)
@@ -223,6 +232,8 @@ class UserLoginView(APIView):
         Jwt.objects.create(user_id=user.id, access=access, refresh=refresh)
 
         userdata = UserModel.objects.get(user=user.id)
+        userdata.notification_token = serializer.validated_data['notificationToken']
+        userdata.save()
         user_contact_list = PairModel.objects.filter(Q(sender=userdata) | Q(receiver=userdata))
 
         serialized_user = UserSerializer(userdata)
@@ -454,6 +465,10 @@ class RecordViewset(ModelViewSet):
                 "language": language,
                 "record_id": record.id
             })
+        
+        print("token:", user_data.notification_token)
+        
+        send_notification(token=user_data.notification_token, msg="New Message", body=f"You have a new message from {user_data.username}", username=user_data.username)
         
         return Response({"file_url": file_url}, status=200)
 

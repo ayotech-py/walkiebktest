@@ -9,6 +9,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UserLoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()
+    notificationToken = serializers.CharField()
 
 class PairSerializer(serializers.ModelSerializer):
     sender = UserSerializer()
@@ -24,3 +25,8 @@ class RecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecordModel
         fields = "__all__"
+
+""" class ExpoTokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExpoTokenModel
+        fields = "__all__" """
