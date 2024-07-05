@@ -419,7 +419,12 @@ class PusherAuthView(APIView):
 def str_to_bool(value):
     return value.lower() in ['true', '1', 't', 'y', 'yes']
 
-
+def check_id_exists(users, id_to_check):
+    for user in users:
+        if user.get('id') == id_to_check:
+            return True
+    return False
+    
 @method_decorator(csrf_exempt, name='dispatch')
 class RecordViewset(ModelViewSet):
     authentication_classes = [Authentication]
