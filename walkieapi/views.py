@@ -30,7 +30,7 @@ from gtts import gTTS
 from google.cloud import texttospeech
 import html
 import requests
-
+from google.cloud import speech
 
 
 def get_rand(length):
@@ -223,6 +223,8 @@ class UserLoginView(APIView):
 
         if not check_user:
             return Response({"message": "invalid emall or password"}, status=400)
+        
+
 
         Jwt.objects.filter(user_id=user.pk).delete()
 
@@ -260,7 +262,6 @@ class UserLoginView(APIView):
     
 class ContactView(APIView):
     def get(self, request):
-        #user = request.user
         keyword = request.GET["search"]
         try:
             search_user = UserModel.objects.get(username=keyword)
@@ -268,6 +269,74 @@ class ContactView(APIView):
             return Response({"search_user": search_user.data}, status=200)
         except UserModel.DoesNotExist:
             return Response({"message": "User with the above username does not exist"}, status=400)
+        
+class resetTokenView(APIView):
+    def get(self, request):
+        keyword = request.GET["email"]
+        try:
+            check_user = UserModel.objects.filter(email=keyword).exists()
+            if not check_user:
+                return Response({"message": "Email address does not exist"}, status=400)
+
+            user = UserModel.objects.get(email=keyword)
+            code = generate_4_digit_code()
+            user.password_reset_token = code
+            user.save()
+
+            send_mail(
+                'Password Reset Code Request',
+                f'Please use this code {code} to complete your password reset',
+                settings.EMAIL_HOST_USER,
+                [user.email],
+                fail_silently=False,
+            )
+
+            return Response({"message": "A four digits code have been sent to your mail"}, status=200)
+        except Exception:
+            return Response({"message": "An error occured, please try again later!"}, status=400)
+        
+class resetVerificationView(APIView):
+    def get(self, request):
+        email = request.GET["email"]
+        token = request.GET["token"]
+        try:
+            user = UserModel.objects.get(email=email)
+            print(user.password_reset_token, token)
+            if user.password_reset_token == token:
+                return Response({"message": "correct token"}, status=200)
+            return Response({"message": "Invalid token"}, status=400)
+        except Exception as e:
+            return Response({"message": "An error occured, please try again later!"}, status=400)
+
+class resetTokenPasswordView(APIView):
+    def post(self, request):
+        data = request.data
+        email = data['email']
+        password = data['password']
+        try:
+            user = User.objects.get(email=email)
+            user.password = make_password(password=password)
+            user.save()
+            return Response({"message", "Password reset successful"}, status=200) 
+        except Exception as e:
+            return Response({"message": "An error occured, please try again later!"}, status=400)
+        
+class emailNotificationView(APIView):
+    authentication_classes = [Authentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        data = request.data
+        emailState = data['emailNotification']
+        try:
+            user = UserModel.objects.get(user=user)
+            user.email_notification = emailState
+            user.save()
+            return Response({"message", "Email state successfuly updated"}, status=200) 
+        except Exception as e:
+            print(e)
+            return Response({"message": "An error occured, please try again later!"}, status=400)
         
 class ProfileImageView(APIView):
     authentication_classes = [Authentication]
@@ -317,6 +386,18 @@ def get_online_users(channel_name):
         'subscription_count': response['channels'][channel_name]['subscription_count']
     }
 
+class PasswordReset(APIView):
+    authentication_classes = [Authentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        data = request.data
+        password = data['password']
+        user.password = make_password(password=password)
+        user.save()
+        return Response({"message", "Password reset successful"}, status=200) 
+
 class PairViewset(ModelViewSet):
     authentication_classes = [Authentication]
     permission_classes = [IsAuthenticated]
@@ -352,9 +433,16 @@ class PairViewset(ModelViewSet):
             }
 
             context['user']["user_id"] = user.id,
-
-            print(context)
-
+            send_notification(token=contact_user.notification_token, msg="Friend Request", body=f"{user_data.username} sent a request to talk and see status", username=user_data.username)
+            
+            if contact_user.email_notification:
+                send_mail(
+                'Friend Request',
+                f"{user_data.username} sent a request to talk and see status",
+                settings.EMAIL_HOST_USER,
+                [contact_user.email],
+                fail_silently=False,
+            )
             return Response({"userData": context}, status=200)
         return Response({"message": "Pair already added"}, status=400)
 
@@ -390,8 +478,17 @@ class PairViewset(ModelViewSet):
             'userData': context
         })
 
-        print("Request data", serializer.data)
+        send_notification(token=pair.sender.notification_token, msg="Friend Request Accepted", body=f"{pair.receiver.username} accepted your request to talk and see status", username=pair.receiver.username)
 
+        if pair.sender.email_notification:
+            send_mail(
+                'Friend Request Accepted',
+                f"{pair.receiver.username} accepted your request to talk and see status",
+                settings.EMAIL_HOST_USER,
+                [pair.sender.email],
+                fail_silently=False,
+            )
+                
         return Response(serializer.data)
 
     
@@ -400,6 +497,7 @@ class PusherAuthView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):        
+
         socket_id = request.data.get('socket_id')
         channel_name = request.data.get('channel_name')
         presence_data = {
@@ -419,12 +517,13 @@ class PusherAuthView(APIView):
 def str_to_bool(value):
     return value.lower() in ['true', '1', 't', 'y', 'yes']
 
+
 def check_id_exists(users, id_to_check):
     for user in users:
         if user.get('id') == id_to_check:
             return True
     return False
-    
+
 @method_decorator(csrf_exempt, name='dispatch')
 class RecordViewset(ModelViewSet):
     authentication_classes = [Authentication]
@@ -438,6 +537,7 @@ class RecordViewset(ModelViewSet):
         file_obj = request.data['file']
         pair_id = request.data.get('pair_id')
         receiver_id = request.data.get('receiver_id')
+        receiver = request.data.get('receiver')
         language = request.data.get('lang')
         user_data = UserModel.objects.get(user=user.id)
 
@@ -452,14 +552,14 @@ class RecordViewset(ModelViewSet):
 
         members = pusher_client.users_info('presence-chat_walkie')
         delivered = False
-        print("Online members:", members)
+
         if receiver_id:
             delivered = check_id_exists(users=members['users'], id_to_check=receiver_id)
-            print("Delivered", delivered)
-        
 
         record = RecordModel.objects.create(pair=pair, sender=user_data, audio_file=file_url, delivered=delivered, language=language)
         record.save()
+
+        receiver_user = UserModel.objects.get(username=receiver)
 
         pusher_client.trigger(f'presence-chat_walkie', 'presence-chat-audio', {
                 'id': pair_id,
@@ -471,10 +571,16 @@ class RecordViewset(ModelViewSet):
                 "record_id": record.id
             })
         
-        print("token:", user_data.notification_token)
-        
-        send_notification(token=user_data.notification_token, msg="New Message", body=f"You have a new message from {user_data.username}", username=user_data.username)
-        
+        send_notification(token=receiver_user.notification_token, msg="New Message", body=f"You have a new message from {user_data.username}", username=user_data.username)
+        if receiver_user.email_notification:
+            send_mail(
+                'New Message',
+                f"You have a new message from {user_data.username}",
+                settings.EMAIL_HOST_USER,
+                [receiver_user.email],
+                fail_silently=False,
+            )
+
         return Response({"file_url": file_url}, status=200)
 
 
@@ -543,8 +649,6 @@ class checkDelivered(APIView):
 
         return Response({"message": "All Messages delivered"}, status=200)
     
-
-from google.cloud import speech
 
 def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speech.RecognizeResponse:
     credentials = service_account.Credentials.from_service_account_info(service_account_info)

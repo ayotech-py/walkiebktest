@@ -37,6 +37,8 @@ class UserModel(models.Model):
     )
     profile_image = models.ImageField(upload_to="profile_images/", default=None)
     notification_token = models.CharField(max_length=255)
+    password_reset_token = models.CharField(max_length=255)
+    email_notification = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.email}"

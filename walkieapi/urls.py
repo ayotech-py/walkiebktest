@@ -15,5 +15,10 @@ urlpatterns = [
     path("photo-api/", ProfileImageView.as_view()),
     path("pusher-auth/", PusherAuthView.as_view()),
     path("check-undelivered/", checkDelivered.as_view()),
-    path("translate-audio/", TranslateView.as_view())
+    path("translate-audio/", TranslateView.as_view()),
+    path("password-reset/", PasswordReset.as_view()),
+    path("password-reset-token/", resetTokenView.as_view()),
+    path("password-verification-token/", resetVerificationView.as_view()),
+    path("password-token-reset/", resetTokenPasswordView.as_view()),
+    path("password-email-notification/", emailNotificationView.as_view()),
 ]
