@@ -30,6 +30,9 @@ from gtts import gTTS
 from google.cloud import texttospeech
 import html
 import requests
+import random
+from django.core.mail import send_mail
+from django.conf import settings
 from google.cloud import speech
 
 
