@@ -20,5 +20,6 @@ urlpatterns = [
     path("password-reset-token/", resetTokenView.as_view()),
     path("password-verification-token/", resetVerificationView.as_view()),
     path("password-token-reset/", resetTokenPasswordView.as_view()),
-    path("password-email-notification/", emailNotificationView.as_view()),
+    path("email-notification/", emailNotificationView.as_view()),
+    path("push-notification/", pushNotificationView.as_view()),
 ]

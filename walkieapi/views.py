@@ -343,6 +343,23 @@ class emailNotificationView(APIView):
         except Exception as e:
             print(e)
             return Response({"message": "An error occured, please try again later!"}, status=400)
+
+class pushNotificationView(APIView):
+    authentication_classes = [Authentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        data = request.data
+        pushState = data['pushNotification']
+        try:
+            user = UserModel.objects.get(user=user)
+            user.push_notification = pushState
+            user.save()
+            return Response({"message", "Notification tate successfuly updated"}, status=200) 
+        except Exception as e:
+            print(e)
+            return Response({"message": "An error occured, please try again later!"}, status=400)
         
 class ProfileImageView(APIView):
     authentication_classes = [Authentication]
@@ -439,7 +456,9 @@ class PairViewset(ModelViewSet):
             }
 
             context['user']["user_id"] = user.id,
-            send_notification(token=contact_user.notification_token, msg="Friend Request", body=f"{user_data.username} sent a request to talk and see status", username=user_data.username)
+
+            if contact_user.push_notification:
+                send_notification(token=contact_user.notification_token, msg="Friend Request", body=f"{user_data.username} sent a request to talk and see status", username=user_data.username)
             
             if contact_user.email_notification:
                 send_mail(
@@ -484,7 +503,8 @@ class PairViewset(ModelViewSet):
             'userData': context
         })
 
-        send_notification(token=pair.sender.notification_token, msg="Friend Request Accepted", body=f"{pair.receiver.username} accepted your request to talk and see status", username=pair.receiver.username)
+        if pair.sender.push_notification:
+            send_notification(token=pair.sender.notification_token, msg="Friend Request Accepted", body=f"{pair.receiver.username} accepted your request to talk and see status", username=pair.receiver.username)
 
         if pair.sender.email_notification:
             send_mail(
@@ -577,7 +597,9 @@ class RecordViewset(ModelViewSet):
                 "record_id": record.id
             })
         
-        send_notification(token=receiver_user.notification_token, msg="New Message", body=f"You have a new message from {user_data.username}", username=user_data.username)
+        if receiver_user.push_notification:
+            send_notification(token=receiver_user.notification_token, msg="New Message", body=f"You have a new message from {user_data.username}", username=user_data.username)
+        
         if receiver_user.email_notification:
             send_mail(
                 'New Message',
@@ -588,7 +610,6 @@ class RecordViewset(ModelViewSet):
             )
 
         return Response({"file_url": file_url}, status=200)
-
 
 class checkDelivered(APIView):
     authentication_classes = [Authentication]

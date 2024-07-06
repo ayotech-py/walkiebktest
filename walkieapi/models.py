@@ -39,6 +39,7 @@ class UserModel(models.Model):
     notification_token = models.CharField(max_length=255)
     password_reset_token = models.CharField(max_length=255)
     email_notification = models.BooleanField(default=False)
+    push_notification = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.email}"
