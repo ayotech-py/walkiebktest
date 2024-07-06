@@ -36,6 +36,9 @@ from django.conf import settings
 from google.cloud import speech
 
 
+def generate_4_digit_code():
+    return f"{random.randint(1000, 9999)}"
+
 def get_rand(length):
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
