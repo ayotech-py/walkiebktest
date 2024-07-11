@@ -792,16 +792,30 @@ def translate_text(target: str, text: str, source: str) -> dict:
 
     return result
 
-def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='/tmp/output.mp3'):
-    credentials = production_credentials
+def text_to_speech(text, lang='en-GB', gender=texttospeech.SsmlVoiceGender.MALE, output_file='/tmp/output.mp3'):
+    credentials = service_account.Credentials.from_service_account_file('/home/ayotech/Documents/walkie/walkiebackend/speechwalkie_service.json')
     client = texttospeech.TextToSpeechClient(credentials=credentials)
 
     input_text = texttospeech.SynthesisInput(text=text)
+    
+    if lang == "en-GB" and gender == texttospeech.SsmlVoiceGender.MALE:
+        voice = texttospeech.VoiceSelectionParams(
+            language_code=lang,
+            name="en-GB-Wavenet-D",
+            ssml_gender=gender
+        )
+    elif lang == "en-GB" and gender == texttospeech.SsmlVoiceGender.FEMALE:
+        voice = texttospeech.VoiceSelectionParams(
+            language_code=lang,
+            name="en-GB-Wavenet-C",
+            ssml_gender=gender
+        )
+    else:
+        voice = texttospeech.VoiceSelectionParams(
+            language_code=lang,
+            ssml_gender=gender
+        )
 
-    voice = texttospeech.VoiceSelectionParams(
-        language_code=lang,
-        ssml_gender=gender
-    )
 
     audio_config = texttospeech.AudioConfig(
         audio_encoding=texttospeech.AudioEncoding.MP3
@@ -845,9 +859,7 @@ class TranslateSelfView(APIView):
         with open(file_name, 'wb+') as destination:
             destination.write(audio_content)
 
-
         output_file = '/tmp/output.mp3'
-
 
         try:
             response = transcribe_model_selection_v2(language=language, audio_path=file_name)
@@ -867,7 +879,7 @@ class TranslateSelfView(APIView):
             non_lang = ["yo-NG", "en", 'ig-NG', 'ha-NG']
             print("target language", target)
             if target in non_lang:
-                target = 'en'
+                target = 'en-GB'
 
             text_to_speech(text=translated_text, lang=target, gender=ssml_gender)
             
