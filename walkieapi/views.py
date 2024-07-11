@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from .models import *
 from .serializers import *
 from rest_framework.viewsets import ModelViewSet
@@ -24,7 +23,6 @@ from google.oauth2 import service_account
 from google.cloud import speech_v2
 from google.cloud.speech_v2.types import cloud_speech
 from rest_framework.parsers import MultiPartParser, FormParser
-import subprocess
 import os
 from gtts import gTTS
 from google.cloud import texttospeech
@@ -76,6 +74,8 @@ def send_notification(token, msg, body, username):
 encoded_credentials = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
 decoded_credentials = base64.b64decode(encoded_credentials)
 service_account_info = json.loads(decoded_credentials)
+
+production_credentials = service_account.Credentials.from_service_account_info(service_account_info)
 
 class UserViewset(ModelViewSet):
     """ authentication_classes = [ApiKeyAuthentication] """
@@ -221,14 +221,14 @@ class UserLoginView(APIView):
                     password=serializer.validated_data["password"],
                 )
                 if not user:
-                    return Response({"message": "invalid email or password"}, status=400)
+                    return Response({"message": "Invalid username/email or password"}, status=400)
             except Exception as e:
-                return Response({"message": "invalid email or password"}, status=400)
+                return Response({"message": "Invalid username/email or password"}, status=400)
 
         check_user = User.objects.filter(id=user.id).exists()
 
         if not check_user:
-            return Response({"message": "invalid emall or password"}, status=400)
+            return Response({"message": "Invalid username/emall or password"}, status=400)
         
 
 
@@ -611,6 +611,7 @@ class RecordViewset(ModelViewSet):
 
         return Response({"file_url": file_url}, status=200)
 
+
 class checkDelivered(APIView):
     authentication_classes = [Authentication]
     permission_classes = [IsAuthenticated]
@@ -678,7 +679,7 @@ class checkDelivered(APIView):
     
 
 def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speech.RecognizeResponse:
-    credentials = service_account.Credentials.from_service_account_info(service_account_info)
+    credentials = production_credentials
     client = speech.SpeechClient(credentials=credentials)
 
     with open(audio_path, "rb") as f:
@@ -741,8 +742,13 @@ class TranslateView(APIView):
                 ssml_gender = texttospeech.SsmlVoiceGender.FEMALE
             else:
                 ssml_gender = texttospeech.SsmlVoiceGender.MALE
+            
+            non_lang = ["yo-NG", "en", 'ig-NG', 'ha-NG']
+            print("target language", target)
+            if target in non_lang:
+                target = 'en'
 
-            text_to_speech(text=translated_text, gender=ssml_gender)
+            text_to_speech(text=translated_text, lang=target, gender=ssml_gender)
             
 
             upload_result = upload(
@@ -766,18 +772,20 @@ class TranslateView(APIView):
             os.remove(file_name)
             os.remove(output_file)
             return Response("An error occured", status=400)
-            
-from google.cloud import translate_v2 as translate
+
+
 
 def translate_text(target: str, text: str, source: str) -> dict:
-    credentials = service_account.Credentials.from_service_account_info(service_account_info)
+    from google.cloud import translate_v2 as translate
+    credentials = production_credentials
+
     translate_client = translate.Client(credentials=credentials)
 
     if isinstance(text, bytes):
         text = text.decode("utf-8")
 
     result = translate_client.translate(text, target_language=target, source_language=source)
-
+    
     print("Text: {}".format(result["input"]))
     print("Translation: {}".format(result["translatedText"]))
     print("Detected source language: {}".format(source))
@@ -785,7 +793,7 @@ def translate_text(target: str, text: str, source: str) -> dict:
     return result
 
 def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, output_file='/tmp/output.mp3'):
-    credentials = service_account.Credentials.from_service_account_info(service_account_info)
+    credentials = production_credentials
     client = texttospeech.TextToSpeechClient(credentials=credentials)
 
     input_text = texttospeech.SynthesisInput(text=text)
@@ -808,3 +816,79 @@ def text_to_speech(text, lang='en', gender=texttospeech.SsmlVoiceGender.MALE, ou
     with open(output_file, 'wb') as out:
         out.write(response.audio_content)
         print(f'Audio content written to {output_file}')
+
+
+class TranslateSelfView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request):
+        file_obj = request.data['file']
+        language = request.data['source']
+        target = request.data['target']
+        gender = request.data['gender']
+
+        print(f"initial langage: {language} target language: {target}")
+
+        upload_result = upload(
+            file_obj,
+            resource_type="video",
+            format="wav"
+        )
+
+
+
+        file_url = upload_result['url']
+
+        response = requests.get(file_url)
+        audio_content = response.content
+
+        file_name = '/tmp/uploaded_audio.mp3'
+
+        with open(file_name, 'wb+') as destination:
+            destination.write(audio_content)
+
+
+        output_file = '/tmp/output.mp3'
+
+
+        try:
+            response = transcribe_model_selection_v2(language=language, audio_path=file_name)
+            
+            transcription = ''
+            for result in response.results:
+                transcription += result.alternatives[0].transcript
+
+            trans_text = translate_text(target=target, text=transcription, source=language.replace('-NG', ''))
+            translated_text = html.unescape(trans_text['translatedText'])
+
+            if gender == 'F':
+                ssml_gender = texttospeech.SsmlVoiceGender.FEMALE
+            else:
+                ssml_gender = texttospeech.SsmlVoiceGender.MALE
+            
+            non_lang = ["yo-NG", "en", 'ig-NG', 'ha-NG']
+            print("target language", target)
+            if target in non_lang:
+                target = 'en'
+
+            text_to_speech(text=translated_text, lang=target, gender=ssml_gender)
+            
+
+            upload_result = upload(
+                output_file,
+                resource_type="auto"
+            )
+            file_url = upload_result['url']
+
+            context = {
+                "file_url": file_url,
+                "text_translate": trans_text,
+            }
+            os.remove(file_name)
+            os.remove(output_file)
+            return Response(context, status=200)
+        except Exception as e:
+            os.remove(file_name)
+            os.remove(output_file)
+            print("error", e)
+            return Response("An error occured", status=400)

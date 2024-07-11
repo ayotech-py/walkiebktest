@@ -22,4 +22,5 @@ urlpatterns = [
     path("password-token-reset/", resetTokenPasswordView.as_view()),
     path("email-notification/", emailNotificationView.as_view()),
     path("push-notification/", pushNotificationView.as_view()),
+    path("translate-self/", TranslateSelfView.as_view())
 ]

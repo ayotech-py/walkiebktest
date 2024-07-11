@@ -59,7 +59,3 @@ class RecordModel(models.Model):
     trans_language = models.URLField()
     delivered = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-
-""" class ExpoTokenModel(models.Model):
-    expo_user = models.OneToOneField(UserModel, on_delete=models.CASCADE)
-    token = models.CharField(max_length=255) """
