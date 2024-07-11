@@ -835,8 +835,6 @@ class TranslateSelfView(APIView):
             format="wav"
         )
 
-
-
         file_url = upload_result['url']
 
         response = requests.get(file_url)
@@ -890,5 +888,4 @@ class TranslateSelfView(APIView):
         except Exception as e:
             os.remove(file_name)
             os.remove(output_file)
-            print("error", e)
             return Response("An error occured", status=400)
