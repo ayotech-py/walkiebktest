@@ -32,7 +32,7 @@ import random
 from django.core.mail import send_mail
 from django.conf import settings
 from google.cloud import speech
-
+from .api_key_auth import ApiKeyAuthentication
 
 def generate_4_digit_code():
     return f"{random.randint(1000, 9999)}"
@@ -57,15 +57,14 @@ def get_refresh_token():
     )
 
 pusher_client = pusher.Pusher(
-  app_id='1828071',
-  key='431004fa41f035822549',
-  secret='812e5e84405a5246d31d',
-  cluster='eu',
+  app_id=settings.PUSHER_APP_ID,
+  key=settings.PUSHER_KEY,
+  secret=settings.PUSHER_SECRET,
+  cluster=settings.PUSHER_CLUSTER,
   ssl=True
 )
 
 def send_notification(token, msg, body, username):
-    print("receipient", username)
     url = "https://exp.host/--/api/v2/push/send"
     headers = {"Content-Type": "application/json"}
     data = {"to": token, "title": msg, "body": body, "data": {"username": username}}
@@ -77,16 +76,18 @@ service_account_info = json.loads(decoded_credentials)
 
 production_credentials = service_account.Credentials.from_service_account_info(service_account_info)
 
+#credentials = production_credentials
+#client = speech.SpeechClient(credentials=credentials)
+
 class UserViewset(ModelViewSet):
-    """ authentication_classes = [ApiKeyAuthentication] """
 
     queryset = UserModel.objects.all()
     serializer_class = UserSerializer
 
     def get_authenticators(self):
         if self.request.method == 'PUT':
-            return [Authentication()]
-        return []
+            return [ApiKeyAuthentication(), Authentication()]
+        return [ApiKeyAuthentication()]
 
     def get_permissions(self):
         if self.request.method == 'PUT':
@@ -106,7 +107,7 @@ class UserViewset(ModelViewSet):
                 email=data["email"],
                 password=make_password(data["password"])
             )
-            UserModel.objects.create(username=data['username'], email=data['email'], user=user)
+            UserModel.objects.create(username=data['username'], email=data['email'], fullname=data['fullname'] , user=user)
             user.save()
             Jwt.objects.filter(user_id=user.pk).delete()
 
@@ -197,7 +198,7 @@ class UserViewset(ModelViewSet):
 
 
 class UserLoginView(APIView):
-    """ authentication_classes = [ApiKeyAuthentication] """
+    authentication_classes = [ApiKeyAuthentication]
 
     serializer_class = UserLoginSerializer
 
@@ -277,6 +278,8 @@ class ContactView(APIView):
             return Response({"message": "User with the above username does not exist"}, status=400)
         
 class resetTokenView(APIView):
+    authentication_classes = [ApiKeyAuthentication]
+
     def get(self, request):
         keyword = request.GET["email"]
         try:
@@ -302,6 +305,8 @@ class resetTokenView(APIView):
             return Response({"message": "An error occured, please try again later!"}, status=400)
         
 class resetVerificationView(APIView):
+    authentication_classes = [ApiKeyAuthentication]
+
     def get(self, request):
         email = request.GET["email"]
         token = request.GET["token"]
@@ -315,6 +320,8 @@ class resetVerificationView(APIView):
             return Response({"message": "An error occured, please try again later!"}, status=400)
 
 class resetTokenPasswordView(APIView):
+    authentication_classes = [ApiKeyAuthentication]
+
     def post(self, request):
         data = request.data
         email = data['email']
@@ -328,7 +335,7 @@ class resetTokenPasswordView(APIView):
             return Response({"message": "An error occured, please try again later!"}, status=400)
         
 class emailNotificationView(APIView):
-    authentication_classes = [Authentication]
+    authentication_classes = [Authentication, ApiKeyAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -345,7 +352,7 @@ class emailNotificationView(APIView):
             return Response({"message": "An error occured, please try again later!"}, status=400)
 
 class pushNotificationView(APIView):
-    authentication_classes = [Authentication]
+    authentication_classes = [Authentication, ApiKeyAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -362,7 +369,7 @@ class pushNotificationView(APIView):
             return Response({"message": "An error occured, please try again later!"}, status=400)
         
 class ProfileImageView(APIView):
-    authentication_classes = [Authentication]
+    authentication_classes = [Authentication, ApiKeyAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -410,7 +417,7 @@ def get_online_users(channel_name):
     }
 
 class PasswordReset(APIView):
-    authentication_classes = [Authentication]
+    authentication_classes = [Authentication, ApiKeyAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
@@ -422,7 +429,7 @@ class PasswordReset(APIView):
         return Response({"message", "Password reset successful"}, status=200) 
 
 class PairViewset(ModelViewSet):
-    authentication_classes = [Authentication]
+    authentication_classes = [Authentication, ApiKeyAuthentication]
     permission_classes = [IsAuthenticated]
 
     queryset = PairModel.objects.all()
@@ -519,7 +526,7 @@ class PairViewset(ModelViewSet):
 
     
 class PusherAuthView(APIView):
-    authentication_classes = [Authentication]
+    authentication_classes = [Authentication, ApiKeyAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):        
@@ -538,6 +545,8 @@ class PusherAuthView(APIView):
             custom_data=presence_data
         )
 
+        print("auth", auth)
+
         return Response(auth)
 
 def str_to_bool(value):
@@ -552,7 +561,7 @@ def check_id_exists(users, id_to_check):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class RecordViewset(ModelViewSet):
-    authentication_classes = [Authentication]
+    authentication_classes = [Authentication, ApiKeyAuthentication]
     permission_classes = [IsAuthenticated]
 
     queryset = RecordModel.objects.all()
@@ -613,7 +622,7 @@ class RecordViewset(ModelViewSet):
 
 
 class checkDelivered(APIView):
-    authentication_classes = [Authentication]
+    authentication_classes = [Authentication, ApiKeyAuthentication]
     permission_classes = [IsAuthenticated]
 
     serializer_class = RecordSerializer
@@ -708,6 +717,8 @@ def transcribe_model_selection_v2(language: str, audio_path: str) -> cloud_speec
     return response
 
 class TranslateView(APIView):
+    authentication_classes = [ApiKeyAuthentication]
+
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request):
@@ -727,7 +738,6 @@ class TranslateView(APIView):
 
         output_file = '/tmp/output.mp3'
 
-
         try:
             response = transcribe_model_selection_v2(language=language, audio_path=file_name)
             
@@ -744,13 +754,11 @@ class TranslateView(APIView):
                 ssml_gender = texttospeech.SsmlVoiceGender.MALE
             
             non_lang = ["yo-NG", "en", 'ig-NG', 'ha-NG']
-            print("target language", target)
             if target in non_lang:
-                target = 'en'
+                target = 'en-GB'
 
             text_to_speech(text=translated_text, lang=target, gender=ssml_gender)
             
-
             upload_result = upload(
                 output_file,
                 resource_type="auto"
@@ -769,8 +777,11 @@ class TranslateView(APIView):
             os.remove(output_file)
             return Response(context, status=200)
         except Exception as e:
-            os.remove(file_name)
-            os.remove(output_file)
+            try:
+                os.remove(file_name)
+                os.remove(output_file)
+            except Exception as e:
+                return Response("An error occured", status=400)
             return Response("An error occured", status=400)
 
 
@@ -834,6 +845,7 @@ def text_to_speech(text, lang='en-GB', gender=texttospeech.SsmlVoiceGender.MALE,
 
 class TranslateSelfView(APIView):
     parser_classes = (MultiPartParser, FormParser)
+    authentication_classes = [ApiKeyAuthentication]
 
     def post(self, request):
         file_obj = request.data['file']

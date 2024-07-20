@@ -12,15 +12,19 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
+
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
 
+from dotenv import load_dotenv, find_dotenv
+
+load_dotenv(find_dotenv())
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-from dotenv import load_dotenv
-load_dotenv()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
@@ -146,7 +150,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "walkie")
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
-""" API_KEY = os.environ["API_KEY"]
+API_KEY = os.environ["API_KEY"]
 
 PUSHER_APP_ID=os.environ['PUSHER_APP_ID']
 PUSHER_KEY=os.environ['PUSHER_KEY']
@@ -155,13 +159,13 @@ PUSHER_CLUSTER=os.environ['PUSHER_CLUSTER']
 
 CLOUD_NAME = os.environ["CLOUD_NAME"]
 CLOUDINARY_API_KEY = os.environ['CLOUDINARY_API_KEY']
-API_SECRET = os.environ['API_SECRET'] """
+API_SECRET = os.environ['API_SECRET']
 
 
 CLOUDINARY_STORAGE = {
-    "CLOUD_NAME" : "di040wc0d", 
-    "API_KEY" : "751378492874732", 
-    "API_SECRET" : "KhEyBsoNXPk-rUiSNTkkv-ecnz4"
+    "CLOUD_NAME" : CLOUD_NAME, 
+    "API_KEY" : CLOUDINARY_API_KEY, 
+    "API_SECRET" : API_SECRET
 }
 
 cloudinary.config(
@@ -174,5 +178,5 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = "ajaomalik2018@gmail.com"
-EMAIL_HOST_PASSWORD = "mrqfvvadwrxfxrbo"
+EMAIL_HOST_USER = os.environ['EMAIL_HOST_USER']
+EMAIL_HOST_PASSWORD = os.environ['EMAIL_HOST_PASSWORD']
