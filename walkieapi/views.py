@@ -86,7 +86,7 @@ class UserViewset(ModelViewSet):
 
     def get_authenticators(self):
         if self.request.method == 'PUT':
-            return [ApiKeyAuthentication(), Authentication()]
+            return [Authentication()]
         return [ApiKeyAuthentication()]
 
     def get_permissions(self):
