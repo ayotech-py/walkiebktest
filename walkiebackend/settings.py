@@ -11,15 +11,6 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
-import os
-
-import cloudinary
-import cloudinary.uploader
-import cloudinary.api
-
-from dotenv import load_dotenv, find_dotenv
-
-load_dotenv(find_dotenv())
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -32,11 +23,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-v594)9zj9t(+ml_jqw*3+17ifjex=6$s=#_9scr&@-4*&+@@0a'
 
+
+ALLOWED_HOSTS = ["*"]
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
-ALLOWED_HOSTS = ['*']
-
 
 # Application definition
 
@@ -85,6 +76,11 @@ WSGI_APPLICATION = 'walkiebackend.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
+
+import os
+from dotenv import load_dotenv, find_dotenv
+
+load_dotenv(find_dotenv())
 
 """ DATABASES = {
     'default': {
@@ -167,6 +163,10 @@ CLOUDINARY_STORAGE = {
     "API_KEY" : CLOUDINARY_API_KEY, 
     "API_SECRET" : API_SECRET
 }
+
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 cloudinary.config(
     cloud_name=CLOUDINARY_STORAGE["CLOUD_NAME"],

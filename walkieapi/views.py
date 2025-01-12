@@ -79,6 +79,11 @@ production_credentials = service_account.Credentials.from_service_account_info(s
 #credentials = production_credentials
 #client = speech.SpeechClient(credentials=credentials)
 
+production = False
+
+use_path = "./" if production == False else "/tmp/"
+
+
 class UserViewset(ModelViewSet):
 
     queryset = UserModel.objects.all()
@@ -363,7 +368,7 @@ class pushNotificationView(APIView):
             user = UserModel.objects.get(user=user)
             user.push_notification = pushState
             user.save()
-            return Response({"message", "Notification tate successfuly updated"}, status=200) 
+            return Response({"message", "Notification state successfuly updated"}, status=200) 
         except Exception as e:
             print(e)
             return Response({"message": "An error occured, please try again later!"}, status=400)
@@ -442,7 +447,7 @@ class PairViewset(ModelViewSet):
         contact_user = UserModel.objects.get(username=keyword)
         sender_user = UserModel.objects.get(user=user)
 
-        check_pair = PairModel.objects.filter(sender=sender_user, receiver=contact_user).exists()
+        check_pair = PairModel.objects.filter(Q(sender=sender_user, receiver=contact_user) | Q(sender=contact_user, receiver=sender_user)).exists()
         
         if not check_pair:
             PairModel.objects.create(sender=sender_user, receiver=contact_user).save()
@@ -615,7 +620,7 @@ class RecordViewset(ModelViewSet):
                 f"You have a new message from {user_data.username}",
                 settings.EMAIL_HOST_USER,
                 [receiver_user.email],
-                fail_silently=False,
+                fail_silently=True,
             )
 
         return Response({"file_url": file_url}, status=200)
@@ -730,13 +735,13 @@ class TranslateView(APIView):
 
         print(f"initial langage: {language} target language: {target}")
 
-        file_name = '/tmp/uploaded_audio.mp3'
+        file_name = f'{use_path}uploaded_audio.mp3'
 
         with open(file_name, 'wb+') as destination:
             for chunk in file_obj.chunks():
                 destination.write(chunk)
 
-        output_file = '/tmp/output.mp3'
+        output_file = f'{use_path}output.mp3'
 
         try:
             response = transcribe_model_selection_v2(language=language, audio_path=file_name)
@@ -803,7 +808,7 @@ def translate_text(target: str, text: str, source: str) -> dict:
 
     return result
 
-def text_to_speech(text, lang='en-GB', gender=texttospeech.SsmlVoiceGender.MALE, output_file='/tmp/output.mp3'):
+def text_to_speech(text, lang='en-GB', gender=texttospeech.SsmlVoiceGender.MALE, output_file=f'{use_path}output.mp3'):
     credentials = production_credentials
     client = texttospeech.TextToSpeechClient(credentials=credentials)
 
@@ -861,17 +866,18 @@ class TranslateSelfView(APIView):
             format="wav"
         )
 
+
         file_url = upload_result['url']
 
         response = requests.get(file_url)
         audio_content = response.content
 
-        file_name = '/tmp/uploaded_audio.mp3'
+        file_name = f'{use_path}uploaded_audio.mp3'
 
         with open(file_name, 'wb+') as destination:
             destination.write(audio_content)
 
-        output_file = '/tmp/output.mp3'
+        output_file = f'{use_path}output.mp3'
 
         try:
             response = transcribe_model_selection_v2(language=language, audio_path=file_name)
