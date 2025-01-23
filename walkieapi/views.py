@@ -79,7 +79,7 @@ production_credentials = service_account.Credentials.from_service_account_info(s
 #credentials = production_credentials
 #client = speech.SpeechClient(credentials=credentials)
 
-production = False
+production = True
 
 use_path = "./" if production == False else "/tmp/"
 
